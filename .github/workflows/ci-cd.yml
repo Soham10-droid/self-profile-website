@@ -1,0 +1,72 @@
+name: CI/CD
+
+# Run on every push to main and on every pull request into main
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Stage 1 - CI: lint and test
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (ESLint)
+        run: npm run lint
+      - name: Test (node:test)
+        run: npm test
+
+  # Stage 2 - Build the Docker image and smoke test it
+  build:
+    needs: lint-and-test          # runs only if lint and tests passed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t self-profile .
+      - name: Smoke test the container
+        run: |
+          docker run -d -p 3000:3000 --name profile self-profile
+          sleep 5
+          curl -f http://localhost:3000/health
+          curl -fs http://localhost:3000/health | grep -q "${GITHUB_SHA::7}"
+          docker stop profile
+
+  # Stage 3 - CD: deploy to Render (only for pushes to main)
+  deploy:
+    needs: build                  # runs only if the image built and started
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}&ref=${{ github.sha }}"
+
+  # Stage 4 - Verify the live site is running this exact commit
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for live /health to report this commit
+        env:
+          LIVE_URL: ${{ vars.LIVE_URL }}
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          for i in $(seq 1 30); do
+            BODY=$(curl -fsS "$LIVE_URL/health" || true)
+            echo "Attempt $i: $BODY"
+            if echo "$BODY" | grep -q "$SHORT"; then
+              echo "Live site is running commit $SHORT"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Live site did not switch to $SHORT in time"
+          exit 1
