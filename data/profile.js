@@ -24,7 +24,7 @@ module.exports = {
     { icon: '☁️', title: 'Cloud and DevOps', detail: 'CI/CD pipelines, Docker and deploying apps end to end.' },
     { icon: '💻', title: 'Web development', detail: 'Server-rendered apps with Node.js and Express.' },
     { icon: '🏏', title: 'Cricket', detail: 'Weekend matches with friends and following the IPL.' },
-    { icon: '📚', title: 'Reading', detail: 'Tech blogs, and the occasional thriller.' },
+   { icon: '📚', title: 'Reading', detail: 'Tech blogs, AI research papers and the occasional thriller.' },
   ],
 
   projects: [
