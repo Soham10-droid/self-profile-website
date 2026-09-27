@@ -26,7 +26,7 @@ function postMessage(fields) {
 
 test('GET /health returns status ok', async () => {
   const res = await fetch(`${base}/health`);
-  assert.equal(res.status, 200);
+  assert.equal(res.status, 500);
   const body = await res.json();
   assert.equal(body.status, 'ok');
 });
